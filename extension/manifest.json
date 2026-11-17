@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "孩童安心上網管理平台",
+  "short_name": "安心上網管理",
+  "version": "2.0.0",
+  "description": "家長管理孩子上網：白名單封鎖、封鎖通知、網站瀏覽通知。設定透過 Chrome 同步，自動套用到孩子登入的每台電腦。",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "declarativeNetRequest", "alarms", "tabs", "identity", "identity.email"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "孩童安心上網管理平台",
+    "default_popup": "pages/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "options_ui": {
+    "page": "pages/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["pages/blocked.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

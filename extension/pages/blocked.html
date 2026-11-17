@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>這個網站還沒有被允許</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .hero { text-align: center; padding-top: 48px; }
+    .hero img { width: 96px; height: 96px; }
+    .hero h1 { justify-content: center; font-size: 26px; margin-top: 12px; }
+    .url { word-break: break-all; font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--muted); }
+    details summary { cursor: pointer; font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <img src="../icons/icon128.png" alt="">
+    <h1>這個網站還沒有被允許</h1>
+    <p class="sub">如果你需要使用 <strong id="host"></strong>，請找爸爸媽媽幫忙喔！</p>
+    <div class="row" style="justify-content:center">
+      <button id="backBtn" class="primary">回上一頁</button>
+    </div>
+  </div>
+
+  <section class="card mt" style="margin-top:40px">
+    <details>
+      <summary>家長：允許這個網站</summary>
+      <p class="url" id="fullUrl"></p>
+      <label for="domain">要允許的網域（含子網域）</label>
+      <input id="domain" type="text">
+      <label for="pw">家長密碼</label>
+      <div class="row">
+        <input id="pw" type="password" autocomplete="current-password">
+        <button id="allowBtn" class="primary">允許並開啟</button>
+      </div>
+      <div id="msg" class="msg"></div>
+    </details>
+  </section>
+</div>
+<script type="module" src="blocked.js"></script>
+</body>
+</html>

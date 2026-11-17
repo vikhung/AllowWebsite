@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>孩童安心上網管理平台 - 家長設定</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1><img src="../icons/icon48.png" alt="">孩童安心上網管理平台</h1>
+  <p class="sub">家長設定頁。所有設定會透過孩子的 Chrome 帳號同步到每一台電腦。</p>
+
+  <!-- 首次設定 -->
+  <section id="setup" class="card hidden">
+    <h2>第一次使用：設定家長密碼</h2>
+    <p class="note">
+      如果您已經在<strong>其他電腦</strong>設定過，請不要在這裡重設：確認孩子已登入 Chrome 並開啟同步，
+      等待設定自動同步下來（通常數十秒到數分鐘），這個頁面會自動更新。
+    </p>
+    <label for="newPw1">家長密碼（至少 6 個字元）</label>
+    <input id="newPw1" type="password" autocomplete="new-password">
+    <label for="newPw2">再輸入一次</label>
+    <input id="newPw2" type="password" autocomplete="new-password">
+    <div class="mt"><button id="setupBtn" class="primary">建立密碼並開始設定</button></div>
+    <div id="setupMsg" class="msg"></div>
+  </section>
+
+  <!-- 登入 -->
+  <section id="login" class="card hidden">
+    <h2>請輸入家長密碼</h2>
+    <div class="row">
+      <input id="loginPw" type="password" autocomplete="current-password" placeholder="家長密碼">
+      <button id="loginBtn" class="primary">進入設定</button>
+    </div>
+    <div id="loginMsg" class="msg"></div>
+  </section>
+
+  <div id="main" class="hidden">
+
+    <!-- ================= 管理功能 1：白名單管理 ================= -->
+    <section id="blockingCard" class="card feature">
+      <div class="feature-head">
+        <div>
+          <div class="feature-tag">管理功能 1</div>
+          <h2>白名單管理</h2>
+          <p class="muted">只允許孩子開啟白名單內的網站，其他網站顯示封鎖頁；可選擇在封鎖時通知家長。</p>
+        </div>
+        <label class="switch" title="啟用 / 停用白名單管理">
+          <input id="blockingEnabled" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="blockingMsg" class="msg"></div>
+
+      <div class="feature-body">
+        <div class="status"><span id="statusDot" class="dot"></span><span id="statusText"></span></div>
+        <div id="pauseRow" class="row mt">
+          <button data-pause="15">暫停 15 分鐘</button>
+          <button data-pause="60">暫停 1 小時</button>
+          <button id="resumeBtn" class="hidden">立即恢復封鎖</button>
+        </div>
+
+        <h3>允許的網站（白名單）</h3>
+        <p class="muted">輸入網域或直接貼上網址，例如 <code>youtube.com</code>。加入後其所有子網域（如 <code>m.youtube.com</code>）也會允許。可一次貼上多行。停用白名單管理時也可以先編輯名單。</p>
+        <textarea id="addInput" placeholder="pbskids.org&#10;https://www.khanacademy.org/"></textarea>
+        <div class="row mt">
+          <button id="addBtn" class="primary">加入白名單</button>
+          <button id="exportBtn">匯出清單</button>
+        </div>
+        <div id="addMsg" class="msg"></div>
+        <ul id="wlList" class="list"></ul>
+        <p class="muted">提示：有些網站需要多個網域才能正常運作（例如影片、登入頁面），若孩子回報畫面被擋，可在封鎖頁面上用家長密碼直接放行。</p>
+
+        <h3>開啟非白名單網站通知</h3>
+        <label class="check"><input id="bNotifyEnabled" type="checkbox"> 孩子開啟非白名單網站（被封鎖）時，呼叫下列 API 通知家長</label>
+        <p class="muted">同一網域 60 秒內只通知一次。</p>
+        <div class="api-form" data-prefix="b">
+          <label for="bMethod">Method</label>
+          <select id="bMethod"><option>POST</option><option>GET</option><option>PUT</option><option>PATCH</option></select>
+          <label for="bUrl">URL</label>
+          <input id="bUrl" type="text" placeholder="https://example.com/webhook" spellcheck="false">
+          <label for="bPayload">Payload</label>
+          <textarea id="bPayload" class="code" spellcheck="false"></textarea>
+          <p class="muted">
+            可用變數：<code>{{email}}</code> 孩子登入 Chrome 的帳號、<code>{{url}}</code> 被擋的網址、
+            <code>{{host}}</code> 網域、<code>{{time}}</code> ISO 時間、<code>{{localTime}}</code> 本地時間、
+            <code>{{timestamp}}</code> 毫秒時間戳。
+          </p>
+          <div class="row mt">
+            <button id="bSave" class="primary">儲存通知設定</button>
+            <button id="bTest">傳送測試通知</button>
+          </div>
+          <div id="bMsg" class="msg"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 管理功能 2：網站瀏覽通知 ================= -->
+    <section id="monitorCard" class="card feature">
+      <div class="feature-head">
+        <div>
+          <div class="feature-tag">管理功能 2</div>
+          <h2>網站瀏覽通知</h2>
+          <p class="muted">孩子瀏覽任何網站時都通知家長，不會封鎖網站。適合第一階段「先觀察」，了解孩子常去哪些網站後再建立白名單。</p>
+        </div>
+        <label class="switch" title="啟用 / 停用網站瀏覽通知">
+          <input id="monitorEnabled" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="monitorMsg" class="msg"></div>
+
+      <div class="feature-body">
+        <p class="muted">網頁載入完成時通知；同一網域 5 分鐘內只通知一次。被白名單管理封鎖的網站不會重複發送瀏覽通知。</p>
+        <div class="api-form" data-prefix="v">
+          <label for="vMethod">Method</label>
+          <select id="vMethod"><option>POST</option><option>GET</option><option>PUT</option><option>PATCH</option></select>
+          <label for="vUrl">URL</label>
+          <input id="vUrl" type="text" placeholder="https://example.com/webhook" spellcheck="false">
+          <label for="vPayload">Payload</label>
+          <textarea id="vPayload" class="code" spellcheck="false"></textarea>
+          <p class="muted">
+            可用變數：<code>{{email}}</code> 孩子登入 Chrome 的帳號、<code>{{title}}</code> 網頁標題、
+            <code>{{url}}</code> 網址、<code>{{host}}</code> 網域、<code>{{time}}</code> ISO 時間、
+            <code>{{localTime}}</code> 本地時間、<code>{{timestamp}}</code> 毫秒時間戳。
+          </p>
+          <div class="row mt">
+            <button id="vSave" class="primary">儲存通知設定</button>
+            <button id="vTest">傳送測試通知</button>
+          </div>
+          <div id="vMsg" class="msg"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>API 格式說明</h2>
+      <p class="muted">
+        URL 中的變數會自動做網址編碼，Payload 中的變數會自動做 JSON 跳脫。Payload 是合法 JSON 時以
+        <code>application/json</code> 送出，否則以純文字送出；Method 為 GET 時不送 Payload。
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>變更家長密碼</h2>
+      <label for="chgPw1">新密碼</label>
+      <input id="chgPw1" type="password" autocomplete="new-password">
+      <label for="chgPw2">再輸入一次</label>
+      <input id="chgPw2" type="password" autocomplete="new-password">
+      <div class="mt"><button id="chgBtn">更新密碼</button></div>
+      <div id="chgMsg" class="msg"></div>
+    </section>
+
+    <section class="card">
+      <h2>跨電腦同步說明</h2>
+      <ol>
+        <li>在孩子使用的每台電腦，讓孩子的 Google 帳號登入 Chrome，並開啟「同步」（至少勾選「擴充功能」）。</li>
+        <li>在任何一台電腦安裝本擴充功能並設定好後，Chrome 會自動在其他電腦安裝本擴充功能，並同步所有設定。</li>
+        <li>修改設定後，其他電腦通常在幾分鐘內自動套用。</li>
+      </ol>
+      <p class="muted" id="syncInfo"></p>
+    </section>
+  </div>
+</div>
+<script type="module" src="options.js"></script>
+</body>
+</html>
