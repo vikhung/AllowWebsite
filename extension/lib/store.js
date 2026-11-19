@@ -2,12 +2,27 @@
 // 所有家長設定都存放在 chrome.storage.sync：只要孩子的 Chrome 帳號開啟同步，
 // 在 A 電腦做的設定會自動同步到 B 電腦。
 
+import {
+  parseTime,
+  normalizeTemplate,
+  DEFAULT_TEMPLATE,
+  DEFAULT_DAILY_TIME,
+  DEFAULT_WEEKLY_TIME,
+  DEFAULT_WEEKDAY,
+} from './report.js';
+
 // 永遠允許的網域（讓孩子能登入 Chrome 帳號以啟用同步）。
 export const SYSTEM_ALLOW = ['accounts.google.com'];
 
 const CONFIG_KEY = 'config'; // 家長密碼等共用設定
 export const BLOCKING_KEY = 'blocking'; // 管理功能 1：白名單管理
 export const MONITOR_KEY = 'monitor'; // 管理功能 2：網站瀏覽通知
+export const REPORT_KEY = 'report'; // 管理功能 3：上網摘要報告
+
+// 以下存在 chrome.storage.local（每台電腦各自一份，不同步）
+export const USAGE_PREFIX = 'usage:'; // usage:YYYY-MM-DD -> { host: 停留毫秒 }
+export const DEVICE_NAME_KEY = 'deviceName';
+export const USAGE_KEEP_DAYS = 35;
 const SYNC_ITEM_LIMIT = 8000; // chrome.storage.sync 單一 key 上限 8192 bytes，保留一點餘裕
 const WL_COUNT_KEY = 'wlCount';
 const WL_CHUNK_PREFIX = 'wl_';
@@ -16,18 +31,42 @@ const CHUNK_BYTES = 6000;
 
 export const NOTIFY_METHODS = ['GET', 'POST', 'PUT', 'PATCH'];
 export const NOTIFY_PAYLOAD_MAX = 2000;
+export const NOTIFY_TOOLS = ['webex', 'slack', 'telegram', 'line', 'discord', 'custom'];
+const DEFAULT_TOOL = 'webex';
 
 // 兩種通知的預設 Payload（各自獨立設定）
 export const DEFAULT_BLOCKED_PAYLOAD =
   '{\n  "text": "{{email}} 嘗試開啟未允許的網站：{{host}}",\n  "email": "{{email}}",\n  "url": "{{url}}",\n  "time": "{{time}}"\n}';
 export const DEFAULT_VISIT_PAYLOAD =
   '{\n  "text": "{{email}} 正在瀏覽：{{title}}（{{host}}）",\n  "email": "{{email}}",\n  "title": "{{title}}",\n  "url": "{{url}}",\n  "time": "{{time}}"\n}';
+// 摘要報告預設為 Webex Incoming Webhook 格式（{{report}} 為 Markdown）
+export const DEFAULT_REPORT_PAYLOAD = '{\n  "markdown": "{{report}}"\n}';
 
 /**
+ * 通知設定：{ tool, url, token, chatId, method, payload }
+ *  tool = webex | slack | telegram | line | discord | custom（見 tools.js）
+ *  url    — Webex / Slack / Discord 的 Webhook 網址，或自訂 API 的 URL
+ *  token  — Telegram Bot Token / LINE Channel access token
+ *  chatId — Telegram Chat ID / LINE 接收者 ID
+ *  method / payload — 只有自訂 API 使用
+ *
  * 設定結構：
  *  blocking — 管理功能 1：白名單管理（封鎖、白名單、封鎖通知）
  *  monitor  — 管理功能 2：網站瀏覽通知
+ *  report   — 管理功能 3：上網摘要報告（每日 / 每週）
  */
+function notifyDefaults(payload) {
+  return { tool: DEFAULT_TOOL, method: 'POST', url: '', token: '', chatId: '', payload };
+}
+
+/** 合併通知設定；2.1 以前沒有 tool 欄位，已填 URL 的視為「自訂 API」以維持原本行為 */
+function normalizeNotify(saved, def) {
+  const clean = Object.fromEntries(Object.entries(saved || {}).filter(([, v]) => v !== undefined));
+  const n = { ...def, ...clean };
+  if (!NOTIFY_TOOLS.includes(clean.tool)) n.tool = clean.url ? 'custom' : def.tool;
+  return n;
+}
+
 const DEFAULT_CONFIG = {
   passwordHash: null,
   salt: null,
@@ -35,11 +74,21 @@ const DEFAULT_CONFIG = {
   blocking: {
     enabled: false, // 預設關閉，家長在設定頁手動啟用
     pauseUntil: 0,
-    notify: { enabled: false, method: 'POST', url: '', payload: DEFAULT_BLOCKED_PAYLOAD },
+    notify: { enabled: false, ...notifyDefaults(DEFAULT_BLOCKED_PAYLOAD) },
   },
   monitor: {
     enabled: false,
-    notify: { method: 'POST', url: '', payload: DEFAULT_VISIT_PAYLOAD },
+    notify: notifyDefaults(DEFAULT_VISIT_PAYLOAD),
+  },
+  report: {
+    enabled: false,
+    daily: true,
+    weekly: true,
+    dailyTime: DEFAULT_DAILY_TIME, // 每天 08:00 寄出前一天的報告
+    weeklyTime: DEFAULT_WEEKLY_TIME, // 每週六 09:00 寄出前 7 天的報告
+    weekday: DEFAULT_WEEKDAY, // 0 = 週日 … 6 = 週六
+    template: DEFAULT_TEMPLATE, // {{report}} 的組成，見 report.js
+    notify: notifyDefaults(DEFAULT_REPORT_PAYLOAD),
   },
 };
 
@@ -68,14 +117,30 @@ export function normalizeConfig(saved = {}) {
     blocking: {
       ...d.blocking,
       ...clean(blocking),
-      notify: { ...d.blocking.notify, ...clean(blocking?.notify) },
+      notify: normalizeNotify(blocking?.notify, d.blocking.notify),
     },
     monitor: {
       ...d.monitor,
       ...clean(monitor),
-      notify: { ...d.monitor.notify, ...clean(monitor?.notify) },
+      notify: normalizeNotify(monitor?.notify, d.monitor.notify),
     },
+    report: normalizeReport(saved.report),
   };
+}
+
+function normalizeReport(saved) {
+  const d = DEFAULT_CONFIG.report;
+  const r = { ...d, ...(saved || {}), notify: normalizeNotify(saved?.notify, d.notify) };
+  delete r.time; // 2.1.0 開發版的舊欄位
+  if (!parseTime(r.dailyTime)) r.dailyTime = d.dailyTime;
+  if (!parseTime(r.weeklyTime)) r.weeklyTime = d.weeklyTime;
+  r.template = normalizeTemplate(r.template);
+  const wd = Number(r.weekday);
+  r.weekday = Number.isInteger(wd) && wd >= 0 && wd <= 6 ? wd : d.weekday;
+  r.enabled = !!r.enabled;
+  r.daily = !!r.daily;
+  r.weekly = !!r.weekly;
+  return r;
 }
 
 /**
@@ -116,11 +181,12 @@ export function buildNotifyRequest(notify, vars) {
 
 /** 讀取完整狀態：{ config, whitelist } */
 export async function loadState() {
-  const head = await chrome.storage.sync.get([CONFIG_KEY, BLOCKING_KEY, MONITOR_KEY, WL_COUNT_KEY]);
+  const head = await chrome.storage.sync.get([CONFIG_KEY, BLOCKING_KEY, MONITOR_KEY, REPORT_KEY, WL_COUNT_KEY]);
   const config = normalizeConfig({
     ...(head[CONFIG_KEY] || {}),
     blocking: head[BLOCKING_KEY],
     monitor: head[MONITOR_KEY],
+    report: head[REPORT_KEY],
   });
   const count = head[WL_COUNT_KEY] || 0;
   let whitelist = [];
@@ -147,8 +213,20 @@ export async function saveConfig(patch) {
     [CONFIG_KEY]: { passwordHash: next.passwordHash, salt: next.salt, updatedAt: next.updatedAt },
     [BLOCKING_KEY]: next.blocking,
     [MONITOR_KEY]: next.monitor,
+    [REPORT_KEY]: next.report,
   });
   return next;
+}
+
+/** 讀取這台電腦指定日期的停留時間：{ "YYYY-MM-DD": { host: ms } } */
+export async function loadUsage(dayKeys) {
+  const got = await chrome.storage.local.get(dayKeys.map((k) => USAGE_PREFIX + k));
+  return Object.fromEntries(dayKeys.map((k) => [k, got[USAGE_PREFIX + k] || {}]));
+}
+
+/** 這台電腦的名稱（存在 storage.local，不同步），顯示在摘要報告上 */
+export async function getDeviceName() {
+  return (await chrome.storage.local.get(DEVICE_NAME_KEY))[DEVICE_NAME_KEY] || '';
 }
 
 /** 檢查某個管理功能區塊存進 sync 後是否會超過單一 key 上限 */

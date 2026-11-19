@@ -4,7 +4,7 @@
 
 ## 管理功能
 
-設定頁分成兩個獨立的管理功能，各自有一個啟用開關、各自的 API 通知設定。兩者**預設都關閉**，可單獨或同時啟用。
+設定頁分成三個獨立的管理功能，各自有一個啟用開關、各自的 API 通知設定。全部**預設關閉**，可單獨或同時啟用。
 
 ### 管理功能 1：白名單管理
 
@@ -27,9 +27,53 @@
 
 被管理功能 1 封鎖的網站不會再算成「瀏覽」，不會重複通知。
 
-## API 通知設定
+### 管理功能 3：上網摘要報告
 
-兩個管理功能各有一組獨立設定（格式可以完全不同，例如送到不同的 Webhook）：
+| 項目 | 說明 |
+| --- | --- |
+| 啟用開關 | 開啟後開始記錄孩子在每個網站（網域）實際停留的時間，**不封鎖** |
+| 計時方式 | 只計算 Chrome 在前景時的作用中分頁；閒置 2 分鐘後停止，但正在播放聲音的分頁（看影片）繼續計時；螢幕鎖定一律停止 |
+| 每日報告 | 每天指定時間（預設上午 08:00）送出**前一天**整天（0:00–24:00）的摘要 |
+| 每週報告 | 每週指定星期與時間（預設週六上午 09:00）送出**前 7 天**的摘要，含每日上網時間 |
+| 多台電腦 | 統計存在 `chrome.storage.local`，每台電腦各自記錄、各自送出（報告標示電腦名稱，可在設定頁修改）；沒有紀錄時不送出 |
+| 補送 | 電腦在排定時間沒開機時，下次開機補送最近一份；送出失敗每 15 分鐘重試 |
+
+報告內容（`{{report}}`）可在設定頁自行組合，旁邊有即時預覽（可切換每日 / 每週、預覽 / 實際送出格式、範例資料 / 這台電腦的實際資料，並顯示報告大小與所選通知工具的單則上限）：
+
+| 區塊 | 預設內容 | 可用變數 |
+| --- | --- | --- |
+| 文字（可新增多個） | 標題、帳號與電腦（分兩行）、總上網時間 | `{{period}}` `{{range}}` `{{email}}` `{{device}}` `{{totalTime}}` `{{siteCount}}` |
+| 停留時間排行 | 前 20 名，其餘合併為「其他」一列 | 每列：`{{rank}}` `{{host}}` `{{time}}` `{{percent}}`；其他列：`{{count}}` `{{time}}` |
+| 每日上網時間（只在每週報告） | 每天一列 | `{{date}}` `{{time}}` |
+
+每個區塊可開關、上下移動、修改文字。文字區塊可按 Enter 或輸入 `\n` 換行，空一行為分段；支援 `**粗體**`、`*斜體*`、`[連結](網址)`，列以 `1. ` / `- ` 開頭會成為清單。格式會依通知工具自動轉換。
+
+## 通知工具
+
+三個管理功能各自選擇通知工具（可以不同），訊息格式依工具**定型化**，只需要填網址或權杖。設定頁每個工具旁都有「如何申請？」視窗，說明申請步驟。
+
+| 工具 | 需要填寫 | 訊息格式 | 單則上限 |
+| --- | --- | --- | --- |
+| Webex（預設） | Incoming Webhook 網址 | Markdown | 約 7,439 bytes |
+| Slack | Incoming Webhook 網址 | mrkdwn（`*粗體*`、`_斜體_`、`<網址\|文字>`） | 約 40,000 字 |
+| Telegram | Bot Token、Chat ID | HTML（`<b>`、`<i>`、`<a>`） | 4,096 字 |
+| LINE | 官方帳號 Messaging API 的 Channel access token、接收者 User ID | 純文字（格式符號自動去除） | 5,000 字 |
+| Discord | 頻道 Webhook 網址 | Markdown（不會觸發 @everyone 等提及） | 2,000 字 |
+| 自訂 API | Method、URL、Payload | 自行決定 | — |
+
+- 超過單則上限時自動截斷並加上「內容過長，已截斷」。
+- LINE Notify 已於 2025/3/31 停止服務，LINE 改用官方帳號 + Messaging API；官方帳號免費方案的每月訊息則數有限，建議只用在摘要報告。
+- 2.1 以前已填 URL 的通知設定會自動轉成「自訂 API」，行為不變。
+
+定型化訊息內容：
+
+| 通知 | 內容 |
+| --- | --- |
+| 封鎖通知 | ⛔ **孩子嘗試開啟未允許的網站**、帳號、網域、網址、時間（各一行） |
+| 瀏覽通知 | 👀 **孩子正在瀏覽網站**、帳號、網頁標題、網址、時間（各一行） |
+| 摘要報告 | 家長在設定頁組合的 `{{report}}` |
+
+### 自訂 API
 
 | 欄位 | 說明 |
 | --- | --- |
@@ -37,32 +81,28 @@
 | URL | 接收通知的網址，可含變數 |
 | Payload | 請求內容，可含變數；是合法 JSON 時以 `application/json` 送出，否則為純文字 |
 
-| 變數 | 封鎖通知 | 瀏覽通知 | 說明 |
-| --- | :---: | :---: | --- |
-| `{{email}}` | ✓ | ✓ | 孩子登入 Chrome 的 Google 帳號（未登入時為「（未登入 Chrome）」） |
-| `{{url}}` | ✓ | ✓ | 網址 |
-| `{{host}}` | ✓ | ✓ | 網域 |
-| `{{title}}` | | ✓ | 網頁標題 |
-| `{{time}}` / `{{localTime}}` / `{{timestamp}}` | ✓ | ✓ | ISO 時間 / 本地時間 / 毫秒時間戳 |
+| 變數 | 封鎖通知 | 瀏覽通知 | 摘要報告 | 說明 |
+| --- | :---: | :---: | :---: | --- |
+| `{{message}}` / `{{messageText}}` | ✓ | ✓ | ✓ | 定型化訊息（Markdown / 純文字） |
+| `{{email}}` | ✓ | ✓ | ✓ | 孩子登入 Chrome 的 Google 帳號（未登入時為「（未登入 Chrome）」） |
+| `{{url}}` / `{{host}}` | ✓ | ✓ | | 網址 / 網域 |
+| `{{title}}` | | ✓ | | 網頁標題 |
+| `{{report}}` / `{{reportText}}` | | | ✓ | 報告（Markdown / 純文字） |
+| `{{period}}` `{{range}}` `{{totalTime}}` `{{siteCount}}` `{{device}}` | | | ✓ | 每日 / 每週、統計日期、總上網時間、網站數、電腦名稱 |
+| `{{time}}` / `{{localTime}}` / `{{timestamp}}` | ✓ | ✓ | ✓ | ISO 時間 / 本地時間 / 毫秒時間戳 |
 
-URL 中的變數自動做網址編碼，Payload 中的變數自動做 JSON 跳脫。每組設定都有「傳送測試通知」按鈕。
+URL 中的變數自動做網址編碼，Payload 中的變數自動做 JSON 跳脫。例如 Google Chat：Payload 填 `{"text":"{{messageText}}"}`。
 
-範例（Payload 皆以 POST 送出）：
-
-| 服務 | URL | 封鎖通知 Payload | 瀏覽通知 Payload |
-| --- | --- | --- | --- |
-| Discord | `https://discord.com/api/webhooks/<id>/<token>` | `{"content":"⛔ {{email}} 嘗試開啟 {{host}}\n{{url}}"}` | `{"content":"👀 {{email}} 瀏覽 {{title}}\n{{url}}"}` |
-| Slack | `https://hooks.slack.com/services/...` | `{"text":"⛔ {{email}} 嘗試開啟 {{host}}"}` | `{"text":"👀 {{email}} 瀏覽 {{title}}（{{host}}）"}` |
-| Telegram | `https://api.telegram.org/bot<token>/sendMessage` | `{"chat_id":"<chat id>","text":"⛔ {{email}} 嘗試開啟 {{host}}"}` | `{"chat_id":"<chat id>","text":"👀 {{email}} 瀏覽 {{title}}"}` |
-
-> 通知設定同樣存在 `chrome.storage.sync`。URL 裡的權杖（token）技術上可被懂電腦的孩子從開發人員工具看到，建議搭配 `policies/windows-lockdown.reg` 停用開發人員工具，並為通知使用專用的 Bot / Webhook。
+> 通知設定（含 Webhook 網址與權杖）同樣存在 `chrome.storage.sync`，技術上可被懂電腦的孩子從開發人員工具看到，建議搭配 `policies/windows-lockdown.reg` 停用開發人員工具，並為通知使用專用的 Bot / Webhook / 官方帳號。
 
 ## 運作原理
 
 | 元件 | 說明 |
 | --- | --- |
-| `extension/background.js` | 管理功能 1：依設定建立 `declarativeNetRequest` 動態規則（低優先規則把所有 http/https 主頁面導向 `blocked.html`，高優先規則放行白名單）。管理功能 2：監聽分頁載入完成並送出瀏覽通知。監聽 `storage.onChanged`，其他電腦同步過來的變更會自動套用。 |
-| `extension/lib/store.js` | 設定讀寫（兩個管理功能分開存放，避開 sync 單一 key 8KB 上限）、白名單分段存放、網域正規化、密碼雜湊、通知請求組裝、舊版設定自動轉換。 |
+| `extension/background.js` | 管理功能 1：依設定建立 `declarativeNetRequest` 動態規則（低優先規則把所有 http/https 主頁面導向 `blocked.html`，高優先規則放行白名單）。管理功能 2：監聽分頁載入完成並送出瀏覽通知。管理功能 3：依分頁 / 視窗焦點 / 閒置狀態計時，每分鐘（`usage-tick` alarm）結算並檢查報告是否到期。監聽 `storage.onChanged`，其他電腦同步過來的變更會自動套用。 |
+| `extension/lib/tools.js` | 通知工具：各工具的欄位、訊息格式轉換（Markdown / Slack mrkdwn / Telegram HTML / 純文字）、請求組裝、截斷與驗證。 |
+| `extension/lib/report.js` | 管理功能 3 的純函式：排程到期判斷、停留時間合併、報告 Markdown 產生。 |
+| `extension/lib/store.js` | 設定讀寫（三個管理功能分開存放，避開 sync 單一 key 8KB 上限）、白名單分段存放、網域正規化、密碼雜湊、通知請求組裝、舊版設定自動轉換。 |
 | `extension/pages/options.*` | 家長設定頁。 |
 | `extension/pages/blocked.*` | 封鎖頁，含家長快速放行。 |
 | `extension/pages/popup.*` | 工具列彈出視窗，顯示兩個管理功能的狀態。 |

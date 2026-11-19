@@ -42,7 +42,6 @@
     <section id="blockingCard" class="card feature">
       <div class="feature-head">
         <div>
-          <div class="feature-tag">管理功能 1</div>
           <h2>白名單管理</h2>
           <p class="muted">只允許孩子開啟白名單內的網站，其他網站顯示封鎖頁；可選擇在封鎖時通知家長。</p>
         </div>
@@ -73,26 +72,9 @@
         <p class="muted">提示：有些網站需要多個網域才能正常運作（例如影片、登入頁面），若孩子回報畫面被擋，可在封鎖頁面上用家長密碼直接放行。</p>
 
         <h3>開啟非白名單網站通知</h3>
-        <label class="check"><input id="bNotifyEnabled" type="checkbox"> 孩子開啟非白名單網站（被封鎖）時，呼叫下列 API 通知家長</label>
+        <label class="check"><input id="bNotifyEnabled" type="checkbox"> 孩子開啟非白名單網站（被封鎖）時，透過下列通知工具通知家長</label>
         <p class="muted">同一網域 60 秒內只通知一次。</p>
-        <div class="api-form" data-prefix="b">
-          <label for="bMethod">Method</label>
-          <select id="bMethod"><option>POST</option><option>GET</option><option>PUT</option><option>PATCH</option></select>
-          <label for="bUrl">URL</label>
-          <input id="bUrl" type="text" placeholder="https://example.com/webhook" spellcheck="false">
-          <label for="bPayload">Payload</label>
-          <textarea id="bPayload" class="code" spellcheck="false"></textarea>
-          <p class="muted">
-            可用變數：<code>{{email}}</code> 孩子登入 Chrome 的帳號、<code>{{url}}</code> 被擋的網址、
-            <code>{{host}}</code> 網域、<code>{{time}}</code> ISO 時間、<code>{{localTime}}</code> 本地時間、
-            <code>{{timestamp}}</code> 毫秒時間戳。
-          </p>
-          <div class="row mt">
-            <button id="bSave" class="primary">儲存通知設定</button>
-            <button id="bTest">傳送測試通知</button>
-          </div>
-          <div id="bMsg" class="msg"></div>
-        </div>
+        <div class="api-form" id="bForm"></div>
       </div>
     </section>
 
@@ -100,7 +82,6 @@
     <section id="monitorCard" class="card feature">
       <div class="feature-head">
         <div>
-          <div class="feature-tag">管理功能 2</div>
           <h2>網站瀏覽通知</h2>
           <p class="muted">孩子瀏覽任何網站時都通知家長，不會封鎖網站。適合第一階段「先觀察」，了解孩子常去哪些網站後再建立白名單。</p>
         </div>
@@ -113,32 +94,121 @@
 
       <div class="feature-body">
         <p class="muted">網頁載入完成時通知；同一網域 5 分鐘內只通知一次。被白名單管理封鎖的網站不會重複發送瀏覽通知。</p>
-        <div class="api-form" data-prefix="v">
-          <label for="vMethod">Method</label>
-          <select id="vMethod"><option>POST</option><option>GET</option><option>PUT</option><option>PATCH</option></select>
-          <label for="vUrl">URL</label>
-          <input id="vUrl" type="text" placeholder="https://example.com/webhook" spellcheck="false">
-          <label for="vPayload">Payload</label>
-          <textarea id="vPayload" class="code" spellcheck="false"></textarea>
-          <p class="muted">
-            可用變數：<code>{{email}}</code> 孩子登入 Chrome 的帳號、<code>{{title}}</code> 網頁標題、
-            <code>{{url}}</code> 網址、<code>{{host}}</code> 網域、<code>{{time}}</code> ISO 時間、
-            <code>{{localTime}}</code> 本地時間、<code>{{timestamp}}</code> 毫秒時間戳。
-          </p>
-          <div class="row mt">
-            <button id="vSave" class="primary">儲存通知設定</button>
-            <button id="vTest">傳送測試通知</button>
-          </div>
-          <div id="vMsg" class="msg"></div>
+        <div class="api-form" id="vForm"></div>
+      </div>
+    </section>
+
+    <!-- ================= 管理功能 3：上網摘要報告 ================= -->
+    <section id="reportCard" class="card feature">
+      <div class="feature-head">
+        <div>
+          <h2>上網摘要報告</h2>
+          <p class="muted">記錄孩子在每個網站實際停留的時間，每天晚上與每週把摘要送到家長指定的 API（例如 Webex），不會封鎖網站。</p>
         </div>
+        <label class="switch" title="啟用 / 停用上網摘要報告">
+          <input id="reportEnabled" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="reportMsg" class="msg"></div>
+
+      <div class="feature-body">
+        <p class="muted">
+          只計算 Chrome 在前景、孩子正在使用時的作用中分頁；閒置 2 分鐘後停止計時，但正在播放聲音的分頁（例如看影片）會繼續計時，螢幕鎖定時一律停止。
+          每台電腦各自記錄、各自送出報告（報告上會標示電腦名稱）；這段期間沒有上網紀錄時不送出。電腦在排定時間沒開機的話，下次開機會補送最近一份。
+        </p>
+
+        <h3>寄送時間</h3>
+        <div class="row">
+          <label class="check"><input id="rDaily" type="checkbox"> 每日報告，每天</label>
+          <input id="rDailyTime" type="time" required>
+          <span class="muted">寄出前一天（0:00–24:00）的摘要</span>
+        </div>
+        <div class="row mt">
+          <label class="check"><input id="rWeekly" type="checkbox"> 每週報告，每週</label>
+          <select id="rWeekday" class="inline">
+            <option value="0">日</option><option value="1">一</option><option value="2">二</option><option value="3">三</option>
+            <option value="4">四</option><option value="5">五</option><option value="6">六</option>
+          </select>
+          <input id="rWeeklyTime" type="time" required>
+          <span class="muted">寄出前 7 天的摘要（含每日上網時間）</span>
+        </div>
+
+        <h3>通知工具</h3>
+        <div class="api-form" id="rForm"></div>
+
+        <h3>報告內容（<code>{{report}}</code> 的組成）</h3>
+        <p class="muted">
+          報告由下列區塊由上到下組成，區塊之間空一行。可以開關、調整順序、修改文字，或新增自己的文字區塊；右邊的預覽會即時更新。
+          文字區塊可以按 Enter（或輸入 <code>\n</code>）換行，空一行為分段；支援 <code>**粗體**</code>、<code>*斜體*</code>、<code>[連結](https://…)</code>，會依下方選擇的通知工具自動轉換格式。
+        </p>
+        <div class="composer">
+          <div>
+            <div id="blockList"></div>
+            <div class="row mt">
+              <button id="addTextBlock">＋ 新增文字區塊</button>
+              <button id="resetTemplate">還原預設內容</button>
+            </div>
+            <details class="mt vars-help">
+              <summary>可用的變數</summary>
+              <ul>
+                <li>所有區塊：<code>{{period}}</code> 每日 / 每週、<code>{{range}}</code> 統計日期、<code>{{email}}</code> 孩子的帳號、<code>{{device}}</code> 電腦名稱、<code>{{totalTime}}</code> 總上網時間、<code>{{siteCount}}</code> 網站數</li>
+                <li>排行的每一列：<code>{{rank}}</code> 名次、<code>{{host}}</code> 網站、<code>{{time}}</code> 停留時間、<code>{{percent}}</code> 百分比</li>
+                <li>排行的「其他」列：<code>{{count}}</code> 其他網站數、<code>{{time}}</code> 其他網站合計時間</li>
+                <li>每日上網時間的每一列：<code>{{date}}</code> 日期、<code>{{time}}</code> 當天上網時間</li>
+                <li>每列以 <code>1. </code> 開頭會顯示成編號清單，以 <code>- </code> 開頭會顯示成項目清單。</li>
+              </ul>
+            </details>
+          </div>
+          <div class="preview-pane">
+            <div class="row preview-tools">
+              <div class="seg" role="tablist">
+                <button id="pvDaily" class="on" type="button">每日</button>
+                <button id="pvWeekly" type="button">每週</button>
+              </div>
+              <div class="seg">
+                <button id="pvRendered" class="on" type="button">預覽</button>
+                <button id="pvRaw" type="button">實際送出格式</button>
+              </div>
+              <select id="pvData" class="inline">
+                <option value="sample">範例資料</option>
+                <option value="real">這台電腦的實際資料</option>
+              </select>
+            </div>
+            <div class="preview-msg">
+              <div class="preview-avatar">📊</div>
+              <div class="preview-bubble">
+                <div class="preview-name"><span id="pvName">上網摘要報告</span> <span class="muted" id="pvWhen"></span></div>
+                <div id="pvBody" class="preview-body"></div>
+                <pre id="pvRawBody" class="preview-raw hidden"></pre>
+              </div>
+            </div>
+            <div id="pvInfo" class="muted mt"></div>
+          </div>
+        </div>
+
+
+        <div id="rActions" class="mt"></div>
+
+        <h3>這台電腦</h3>
+        <label for="deviceName">電腦名稱（顯示在報告上，只存在這台電腦，不會同步）</label>
+        <div class="row">
+          <input id="deviceName" type="text" maxlength="40">
+          <button id="deviceSave">儲存名稱</button>
+        </div>
+        <div id="deviceMsg" class="msg"></div>
+        <p class="muted">這台電腦今天的上網時間：</p>
+        <ul id="todayList" class="list"></ul>
       </div>
     </section>
 
     <section class="card">
-      <h2>API 格式說明</h2>
+      <h2>通知工具說明</h2>
       <p class="muted">
-        URL 中的變數會自動做網址編碼，Payload 中的變數會自動做 JSON 跳脫。Payload 是合法 JSON 時以
-        <code>application/json</code> 送出，否則以純文字送出；Method 為 GET 時不送 Payload。
+        每個管理功能可以選擇不同的通知工具（Webex、Slack、Telegram、LINE、Discord），訊息格式會依工具自動調整，只需要填入網址或權杖；
+        點選「如何申請？」可以看到各工具的申請步驟。選擇「自訂 API」時可以自行設定 Method / URL / Payload：
+        URL 中的變數會自動做網址編碼，Payload 中的變數會自動做 JSON 跳脫；Payload 是合法 JSON 時以 <code>application/json</code> 送出，
+        否則以純文字送出；Method 為 GET 時不送 Payload。
       </p>
     </section>
 
@@ -163,6 +233,14 @@
     </section>
   </div>
 </div>
+<dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+  <div class="help-head">
+    <h2 id="helpTitle">如何申請通知工具</h2>
+    <button id="helpClose" type="button" aria-label="關閉">✕</button>
+  </div>
+  <div id="helpTabs" class="seg help-tabs" role="tablist"></div>
+  <div id="helpBody" class="help-body"></div>
+</dialog>
 <script type="module" src="options.js"></script>
 </body>
 </html>

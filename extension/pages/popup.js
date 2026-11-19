@@ -8,6 +8,7 @@ const $ = (id) => document.getElementById(id);
     $('dot').className = 'dot off';
     $('status').textContent = '尚未設定';
     $('dot2').parentElement.classList.add('hidden');
+    $('dot3').parentElement.classList.add('hidden');
     return;
   }
   // 管理功能 1：白名單管理
@@ -22,6 +23,9 @@ const $ = (id) => document.getElementById(id);
   // 管理功能 2：網站瀏覽通知
   $('dot2').className = 'dot' + (config.monitor.enabled ? '' : ' off');
   $('status2').textContent = '網站瀏覽通知：' + (config.monitor.enabled ? '啟用中' : '未啟用');
+  // 管理功能 3：上網摘要報告
+  $('dot3').className = 'dot' + (config.report.enabled ? '' : ' off');
+  $('status3').textContent = '上網摘要報告：' + (config.report.enabled ? '啟用中' : '未啟用');
 
   if (!config.blocking.enabled) return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
